@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/Badge';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/DataTable';
-import type { Occurrence, Employee } from '@controle-ponto/types';
+import type { Occurrence, Employee } from '@/types';
 import {
   formatDateBR,
   formatMinutes,

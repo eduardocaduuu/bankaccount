@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/Badge';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/DataTable';
-import type { Employee } from '@controle-ponto/types';
+import type { Employee } from '@/types';
 
 interface EmployeeWithSector extends Employee {
   sector?: { name: string };

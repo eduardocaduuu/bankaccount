@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/Badge';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/DataTable';
-import type { Sector } from '@controle-ponto/types';
+import type { Sector } from '@/types';
 
 export default function SectorsPage() {
   const [sectors, setSectors] = useState<Sector[]>([]);
