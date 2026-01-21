@@ -1,0 +1,207 @@
+// ===========================================
+// CONTROLE PONTO SÓLIDES - PRISMA SCHEMA
+// ===========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================
+// SETORES
+// ===========================================
+
+model Sector {
+  id                 String     @id @default(cuid())
+  name               String     @unique
+  managerSlackUserId String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  employees Employee[]
+
+  @@map("sectors")
+}
+
+// ===========================================
+// COLABORADORES
+// ===========================================
+
+model Employee {
+  id                String   @id @default(cuid())
+  name              String
+  solidesEmployeeId String   @unique
+  slackUserId       String?  @unique
+  sectorId          String
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  sector           Sector            @relation(fields: [sectorId], references: [id])
+  punchEvents      PunchEvent[]
+  dailyWorklogs    DailyWorklog[]
+  occurrences      Occurrence[]
+  justifications   Justification[]
+  notificationLogs NotificationLog[]
+
+  @@map("employees")
+}
+
+// ===========================================
+// EVENTOS DE PONTO (MARCAÇÕES)
+// ===========================================
+
+model PunchEvent {
+  id                String   @id @default(cuid())
+  employeeId        String
+  timestamp         DateTime
+  type              PunchType
+  sourcePayloadJson String?  @db.Text
+  createdAt         DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, timestamp])
+  @@map("punch_events")
+}
+
+enum PunchType {
+  ENTRY
+  EXIT
+}
+
+// ===========================================
+// JORNADA DIÁRIA
+// ===========================================
+
+model DailyWorklog {
+  id            String        @id @default(cuid())
+  employeeId    String
+  date          DateTime      @db.Date
+  workedMinutes Int           @default(0)
+  lateMinutes   Int           @default(0)
+  extraMinutes  Int           @default(0)
+  underMinutes  Int           @default(0)
+  status        WorklogStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date])
+  @@map("daily_worklogs")
+}
+
+enum WorklogStatus {
+  PENDING
+  PROCESSED
+  ERROR
+}
+
+// ===========================================
+// OCORRÊNCIAS
+// ===========================================
+
+model Occurrence {
+  id         String           @id @default(cuid())
+  employeeId String
+  date       DateTime         @db.Date
+  type       OccurrenceType
+  minutes    Int
+  status     OccurrenceStatus @default(OPEN)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  employee       Employee        @relation(fields: [employeeId], references: [id])
+  justifications Justification[]
+  notifications  NotificationLog[]
+
+  @@index([employeeId, date])
+  @@index([status])
+  @@map("occurrences")
+}
+
+enum OccurrenceType {
+  LATE
+  OVER
+  UNDER
+  INCOMPLETE
+}
+
+enum OccurrenceStatus {
+  OPEN
+  ACK
+  RESOLVED
+}
+
+// ===========================================
+// JUSTIFICATIVAS
+// ===========================================
+
+model Justification {
+  id           String                 @id @default(cuid())
+  occurrenceId String
+  employeeId   String
+  date         DateTime               @db.Date
+  text         String                 @db.Text
+  category     JustificationCategory?
+  notifyHR     Boolean                @default(false)
+  createdAt    DateTime               @default(now())
+
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id])
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+
+  @@map("justifications")
+}
+
+enum JustificationCategory {
+  MEDICAL
+  PERSONAL
+  TRAFFIC
+  WORK_OFFSITE
+  MEETING
+  OTHER
+}
+
+// ===========================================
+// LOG DE NOTIFICAÇÕES
+// ===========================================
+
+model NotificationLog {
+  id           String              @id @default(cuid())
+  employeeId   String
+  occurrenceId String?
+  channel      NotificationChannel
+  messageTs    String?
+  sentAt       DateTime            @default(now())
+
+  employee   Employee    @relation(fields: [employeeId], references: [id])
+  occurrence Occurrence? @relation(fields: [occurrenceId], references: [id])
+
+  @@unique([employeeId, occurrenceId, channel])
+  @@map("notification_logs")
+}
+
+enum NotificationChannel {
+  DM_EMPLOYEE
+  DM_MANAGER
+  HR
+}
+
+// ===========================================
+// CONFIGURAÇÕES
+// ===========================================
+
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

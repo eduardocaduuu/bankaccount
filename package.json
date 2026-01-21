@@ -1,0 +1,30 @@
+{
+  "name": "controle-ponto-solides",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de controle de ponto e banco de horas integrado com Sólides",
+  "scripts": {
+    "dev": "concurrently -n api,bot,web -c blue,green,magenta \"pnpm --filter @controle-ponto/api dev\" \"pnpm --filter @controle-ponto/slack-bot dev\" \"pnpm --filter @controle-ponto/web dev\"",
+    "dev:api": "pnpm --filter @controle-ponto/api dev",
+    "dev:bot": "pnpm --filter @controle-ponto/slack-bot dev",
+    "dev:web": "pnpm --filter @controle-ponto/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm --filter @controle-ponto/core test",
+    "test:watch": "pnpm --filter @controle-ponto/core test:watch",
+    "db:generate": "pnpm --filter @controle-ponto/db generate",
+    "db:migrate": "pnpm --filter @controle-ponto/db migrate",
+    "db:push": "pnpm --filter @controle-ponto/db push",
+    "db:studio": "pnpm --filter @controle-ponto/db studio",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

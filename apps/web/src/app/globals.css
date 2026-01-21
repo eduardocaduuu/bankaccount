@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-background text-text-primary;
+  }
+
+  body {
+    @apply antialiased;
+  }
+
+  * {
+    @apply border-border;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface rounded-xl border border-border p-4;
+  }
+
+  .card-hover {
+    @apply card transition-colors hover:bg-surface-hover cursor-pointer;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent-purple text-white hover:bg-accent-purple/90;
+  }
+
+  .btn-secondary {
+    @apply btn bg-surface text-text-primary hover:bg-surface-hover;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-text-secondary hover:bg-surface hover:text-text-primary;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-border bg-surface px-4 py-2 text-text-primary placeholder:text-text-tertiary focus:border-border-focus focus:outline-none focus:ring-1 focus:ring-border-focus;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .badge-purple {
+    @apply badge bg-accent-purple/20 text-accent-purple;
+  }
+
+  .badge-blue {
+    @apply badge bg-accent-blue/20 text-accent-blue;
+  }
+
+  .badge-green {
+    @apply badge bg-accent-green/20 text-accent-green;
+  }
+
+  .badge-yellow {
+    @apply badge bg-accent-yellow/20 text-accent-yellow;
+  }
+
+  .badge-red {
+    @apply badge bg-accent-red/20 text-accent-red;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-border-focus;
+}
