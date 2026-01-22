@@ -192,16 +192,18 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
       const data = await response.json() as Record<string, unknown>;
 
       // Adapta a resposta - formato pode variar conforme API Tangerino
-      const employees = Array.isArray(data)
+      const rawEmployees = Array.isArray(data)
         ? data
-        : (data.employees || data.data || data.items || []) as unknown[];
+        : (data.employees || data.data || data.items || []);
+
+      const employees = rawEmployees as Record<string, unknown>[];
 
       logger.info(
         { count: employees.length },
         '[READ-ONLY] Funcionários consultados do Tangerino - Nenhuma alteração realizada na Sólides'
       );
 
-      return employees.map((emp: Record<string, unknown>) => ({
+      return employees.map((emp) => ({
         id: String(emp.id || emp.employee_id || emp.employeeId || emp.codigo),
         name: String(emp.name || emp.full_name || emp.fullName || emp.nome || 'Desconhecido'),
         email: emp.email ? String(emp.email) : undefined,
@@ -241,16 +243,18 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
       const data = await response.json() as Record<string, unknown>;
 
       // Adapta a resposta - formato pode variar conforme API Tangerino
-      const punches = Array.isArray(data)
+      const rawPunches = Array.isArray(data)
         ? data
-        : (data.punches || data.data || data.items || data.marcacoes || []) as unknown[];
+        : (data.punches || data.data || data.items || data.marcacoes || []);
+
+      const punches = rawPunches as Record<string, unknown>[];
 
       logger.info(
         { count: punches.length, startDate, endDate },
         '[READ-ONLY] Marcações de ponto consultadas do Tangerino - Nenhuma alteração enviada para a Sólides'
       );
 
-      return punches.map((punch: Record<string, unknown>) => ({
+      return punches.map((punch) => ({
         employeeId: String(
           punch.employee_id ||
           punch.employeeId ||
