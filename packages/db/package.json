@@ -27,7 +27,8 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@prisma/client": "^5.9.0"
+    "@prisma/client": "^5.9.0",
+    "@types/node": "^20.11.0"
   },
   "devDependencies": {
     "prisma": "^5.9.0",
