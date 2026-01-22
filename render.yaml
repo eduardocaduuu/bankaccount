@@ -1,0 +1,48 @@
+# ===========================================
+# RENDER DEPLOY CONFIGURATION
+# ===========================================
+# Este arquivo configura o deploy da API no Render
+# A API é READ-ONLY e não altera dados no Tangerino
+# ===========================================
+
+services:
+  # API Backend
+  - type: web
+    name: controle-ponto-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: |
+      npm install -g pnpm &&
+      pnpm install &&
+      pnpm --filter @controle-ponto/types build &&
+      pnpm --filter @controle-ponto/db build &&
+      pnpm --filter @controle-ponto/core build &&
+      pnpm --filter @controle-ponto/api build
+    startCommand: |
+      cd apps/api && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: 3001
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        sync: false
+      - key: API_INTERNAL_TOKEN
+        sync: false
+      - key: SOLIDES_BASE_URL
+        value: https://apis.tangerino.com.br
+      - key: SOLIDES_API_KEY
+        sync: false
+      - key: SOLIDES_API_KEY_HEADER_NAME
+        value: Authorization
+      - key: SOLIDES_EMPLOYEES_PATH
+        value: /v1/employees
+      - key: SOLIDES_PUNCHES_PATH
+        value: /v1/punches
+      - key: TZ
+        value: America/Maceio
+    healthCheckPath: /health
+    autoDeploy: true
