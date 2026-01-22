@@ -1,6 +1,6 @@
 import { prisma, type PunchType as PrismaPunchType, type OccurrenceType as PrismaOccurrenceType } from '@controle-ponto/db';
-import { calculateWorklog, DEFAULT_WORKDAY_CONFIG, type WorkdayConfig } from '@controle-ponto/core';
-import type { Punch, PunchType, WorklogCalculation } from '@controle-ponto/types';
+import { calculateWorklog, DEFAULT_WORKDAY_CONFIG } from '@controle-ponto/core';
+import type { Punch, PunchType, WorklogCalculation, WorkdayConfig } from '@controle-ponto/types';
 import { logger } from '../utils/logger.js';
 
 export class WorklogService {

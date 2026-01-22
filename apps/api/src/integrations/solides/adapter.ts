@@ -189,12 +189,12 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, unknown>;
 
       // Adapta a resposta - formato pode variar conforme API Tangerino
       const employees = Array.isArray(data)
         ? data
-        : data.employees || data.data || data.items || [];
+        : (data.employees || data.data || data.items || []) as unknown[];
 
       logger.info(
         { count: employees.length },
@@ -238,12 +238,12 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, unknown>;
 
       // Adapta a resposta - formato pode variar conforme API Tangerino
       const punches = Array.isArray(data)
         ? data
-        : data.punches || data.data || data.items || data.marcacoes || [];
+        : (data.punches || data.data || data.items || data.marcacoes || []) as unknown[];
 
       logger.info(
         { count: punches.length, startDate, endDate },
