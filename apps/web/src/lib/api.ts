@@ -11,7 +11,7 @@ import type {
   UpdateEmployeeDto,
 } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
 const API_TOKEN = process.env.API_INTERNAL_TOKEN || '';
 
 async function fetchApi<T>(

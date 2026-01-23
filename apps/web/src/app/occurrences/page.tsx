@@ -47,7 +47,8 @@ export default function OccurrencesPage() {
       if (dateFilter) params.set('date', dateFilter);
 
       const queryString = params.toString();
-      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/occurrences${queryString ? `?${queryString}` : ''}`;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
+      const url = `${apiUrl}/occurrences${queryString ? `?${queryString}` : ''}`;
 
       const response = await fetch(url, {
         headers: {
