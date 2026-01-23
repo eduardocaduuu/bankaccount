@@ -18,6 +18,8 @@ export async function proxyRequest(
     url += `?${searchParams.toString()}`;
   }
 
+  console.log(`[Proxy] ${method} ${url} - Token: ${API_TOKEN ? 'present' : 'missing'}`);
+
   try {
     const response = await fetch(url, {
       method,
@@ -29,13 +31,21 @@ export async function proxyRequest(
       cache: 'no-store',
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { success: false, error: 'Invalid JSON response', raw: text.substring(0, 200) };
+    }
+
+    console.log(`[Proxy] Response: ${response.status}`, data);
 
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error(`Proxy error for ${path}:`, error);
+    console.error(`[Proxy] Error for ${path}:`, error);
     return NextResponse.json(
-      { success: false, error: 'Failed to connect to API' },
+      { success: false, error: 'Failed to connect to API', details: String(error) },
       { status: 500 }
     );
   }
