@@ -11,17 +11,23 @@ import type {
   UpdateEmployeeDto,
 } from '@/types';
 
-// Use local API routes as proxy (token is handled server-side)
-const API_URL = '/api';
+// Server-side: call Render API directly with token
+// Client-side: use local /api proxy routes
+const isServer = typeof window === 'undefined';
+const RENDER_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
+const API_TOKEN = process.env.API_INTERNAL_TOKEN || '';
 
 async function fetchApi<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_URL}${path}`;
+  // On server, call Render directly. On client, use /api proxy.
+  const baseUrl = isServer ? RENDER_API_URL : '/api';
+  const url = `${baseUrl}${path}`;
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    ...(isServer && API_TOKEN ? { 'x-internal-token': API_TOKEN } : {}),
     ...options.headers,
   };
 
