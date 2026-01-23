@@ -32,16 +32,9 @@ export default function SettingsPage() {
     setConnectionStatus('idle');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
-      const response = await fetch(
-        `${apiUrl}/integrations/solides/test`,
-        {
-          method: 'POST',
-          headers: {
-            'x-internal-token': process.env.API_INTERNAL_TOKEN || '',
-          },
-        }
-      );
+      const response = await fetch('/api/integrations/solides/test', {
+        method: 'POST',
+      });
 
       if (response.ok) {
         setConnectionStatus('success');
@@ -62,15 +55,9 @@ export default function SettingsPage() {
     const today = new Date().toISOString().split('T')[0];
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
       const response = await fetch(
-        `${apiUrl}/integrations/solides/sync?start=${today}&end=${today}`,
-        {
-          method: 'POST',
-          headers: {
-            'x-internal-token': process.env.API_INTERNAL_TOKEN || '',
-          },
-        }
+        `/api/integrations/solides/sync?start=${today}&end=${today}`,
+        { method: 'POST' }
       );
 
       const data = await response.json();

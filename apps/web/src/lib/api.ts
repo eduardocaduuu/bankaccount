@@ -11,8 +11,8 @@ import type {
   UpdateEmployeeDto,
 } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
-const API_TOKEN = process.env.API_INTERNAL_TOKEN || '';
+// Use local API routes as proxy (token is handled server-side)
+const API_URL = '/api';
 
 async function fetchApi<T>(
   path: string,
@@ -22,7 +22,6 @@ async function fetchApi<T>(
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    'x-internal-token': API_TOKEN,
     ...options.headers,
   };
 

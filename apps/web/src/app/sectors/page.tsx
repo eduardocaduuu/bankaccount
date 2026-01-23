@@ -25,15 +25,7 @@ export default function SectorsPage() {
 
   const fetchSectors = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
-      const response = await fetch(
-        `${apiUrl}/sectors`,
-        {
-          headers: {
-            'x-internal-token': process.env.API_INTERNAL_TOKEN || '',
-          },
-        }
-      );
+      const response = await fetch('/api/sectors');
       const data = await response.json();
       setSectors(data.data || []);
     } catch (error) {

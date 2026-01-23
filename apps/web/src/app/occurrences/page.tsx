@@ -47,14 +47,8 @@ export default function OccurrencesPage() {
       if (dateFilter) params.set('date', dateFilter);
 
       const queryString = params.toString();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
-      const url = `${apiUrl}/occurrences${queryString ? `?${queryString}` : ''}`;
-
-      const response = await fetch(url, {
-        headers: {
-          'x-internal-token': process.env.API_INTERNAL_TOKEN || '',
-        },
-      });
+      const url = `/api/occurrences${queryString ? `?${queryString}` : ''}`;
+      const response = await fetch(url);
       const data = await response.json();
       setOccurrences(data.data || []);
     } catch (error) {

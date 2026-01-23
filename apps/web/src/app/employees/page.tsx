@@ -29,15 +29,7 @@ export default function EmployeesPage() {
 
   const fetchEmployees = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://controle-ponto-api-3kle.onrender.com';
-      const response = await fetch(
-        `${apiUrl}/employees`,
-        {
-          headers: {
-            'x-internal-token': process.env.API_INTERNAL_TOKEN || '',
-          },
-        }
-      );
+      const response = await fetch('/api/employees');
       const data = await response.json();
       setEmployees(data.data || []);
     } catch (error) {
