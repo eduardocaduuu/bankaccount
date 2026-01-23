@@ -1,4 +1,4 @@
-import type { SolidesAdapter, SolidesEmployee, SolidesPunch } from '@controle-ponto/types';
+import type { SolidesAdapter, SolidesEmployee, SolidesPunch, TangerinoDailySummary } from '@controle-ponto/types';
 import { logger } from '../../utils/logger.js';
 
 // ===========================================
@@ -13,6 +13,9 @@ import { logger } from '../../utils/logger.js';
 // - O ponto oficial continua sendo o da Sólides/Tangerino
 // - Este sistema é apenas para análise interna de banco de horas
 //
+// API Principal: https://apis.tangerino.com.br/punch
+// Endpoint: GET /daily-summary/
+//
 // ENDPOINTS PROIBIDOS (nunca serão chamados):
 // - POST/PUT/PATCH/DELETE para qualquer recurso
 // - /adjustment, /record, /insert, /update, /delete
@@ -21,12 +24,12 @@ import { logger } from '../../utils/logger.js';
 // ===========================================
 
 export interface TangerinoConfig {
-  baseUrl: string; // URL para funcionários
-  punchesBaseUrl?: string; // URL para punches (se diferente)
+  baseUrl: string;              // URL para funcionários (employer.tangerino.com.br)
+  punchesBaseUrl: string;       // URL para punches (apis.tangerino.com.br/punch)
   apiKey: string;
   apiKeyHeaderName: string;
   employeesPath: string;
-  punchesPath: string;
+  punchesPath: string;          // Path para daily-summary (/daily-summary/)
 }
 
 /**
@@ -58,7 +61,16 @@ const FORBIDDEN_ENDPOINT_KEYWORDS = [
   'post',
   'put',
   'patch',
+  'register',
 ] as const;
+
+/**
+ * Converte data string (YYYY-MM-DD) para timestamp em milissegundos
+ */
+function dateToTimestamp(dateStr: string): number {
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.getTime();
+}
 
 /**
  * Adapter READ-ONLY para integração com Tangerino/Sólides
@@ -74,7 +86,11 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
   constructor(config: TangerinoConfig) {
     this.config = config;
     logger.info(
-      { baseUrl: config.baseUrl },
+      {
+        baseUrl: config.baseUrl,
+        punchesBaseUrl: config.punchesBaseUrl,
+        punchesPath: config.punchesPath
+      },
       '[READ-ONLY] Adapter Tangerino inicializado - Integração somente leitura'
     );
   }
@@ -117,7 +133,7 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
 
     logger.info(
       { url, method },
-      '[READ-ONLY] Executando consulta segura - Nenhum dado será enviado para a Sólides'
+      '[READ-ONLY] Executando consulta segura - Nenhum dado será enviado para o Tangerino'
     );
 
     const response = await fetch(url, {
@@ -131,40 +147,54 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
     });
 
     logger.info(
-      { url, status: response.status },
-      '[READ-ONLY] Consulta realizada - Nenhuma alteração enviada para a Sólides'
+      { url, status: response.status, statusText: response.statusText },
+      '[READ-ONLY] Resposta recebida do Tangerino'
     );
 
     return response;
   }
 
   /**
-   * Testa conexão com a API (somente leitura)
+   * Testa conexão com a API de daily-summary (somente leitura)
+   * Usa parâmetros mock para verificar se a autenticação funciona
    */
   async testConnection(): Promise<boolean> {
     try {
-      const url = `${this.config.baseUrl}${this.config.employeesPath}`;
+      // Usa o endpoint /daily-summary/ com parâmetros mock para testar
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const todayTimestamp = dateToTimestamp(todayStr);
+
+      const url = new URL(`${this.config.punchesBaseUrl}${this.config.punchesPath}`);
+      url.searchParams.set('startDate', todayTimestamp.toString());
+      url.searchParams.set('endDate', todayTimestamp.toString());
+      url.searchParams.set('reprocess', 'false');
 
       logger.info(
-        { url },
-        '[READ-ONLY] Testando conexão com Tangerino - Consulta de verificação'
+        { url: url.toString() },
+        '[READ-ONLY] Testando conexão com Tangerino /daily-summary/ - Consulta de verificação'
       );
 
-      const response = await this.secureRequest(url);
+      const response = await this.secureRequest(url.toString());
 
       if (response.ok) {
-        logger.info('[READ-ONLY] Conexão com Tangerino estabelecida com sucesso');
+        const data = await response.json();
+        logger.info(
+          { status: response.status, recordCount: Array.isArray(data) ? data.length : 0 },
+          '[READ-ONLY] Conexão com Tangerino estabelecida com sucesso'
+        );
+        return true;
       } else {
+        const errorText = await response.text();
         logger.warn(
-          { status: response.status },
+          { status: response.status, statusText: response.statusText, error: errorText },
           '[READ-ONLY] Conexão com Tangerino falhou'
         );
+        return false;
       }
-
-      return response.ok;
     } catch (error) {
       logger.error(
-        { error },
+        { error: error instanceof Error ? error.message : error },
         '[READ-ONLY] Erro ao testar conexão com Tangerino'
       );
       return false;
@@ -187,7 +217,8 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
       const response = await this.secureRequest(url);
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json() as Record<string, unknown>;
@@ -195,13 +226,13 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
       // Adapta a resposta - formato pode variar conforme API Tangerino
       const rawEmployees = Array.isArray(data)
         ? data
-        : (data.employees || data.data || data.items || []);
+        : (data.employees || data.data || data.items || data.content || []);
 
       const employees = rawEmployees as Record<string, unknown>[];
 
       logger.info(
         { count: employees.length },
-        '[READ-ONLY] Funcionários consultados do Tangerino - Nenhuma alteração realizada na Sólides'
+        '[READ-ONLY] Funcionários consultados do Tangerino - Nenhuma alteração realizada'
       );
 
       return employees.map((emp) => ({
@@ -213,7 +244,7 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
       }));
     } catch (error) {
       logger.error(
-        { error },
+        { error: error instanceof Error ? error.message : error },
         '[READ-ONLY] Erro ao buscar funcionários do Tangerino'
       );
       throw error;
@@ -221,63 +252,152 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
   }
 
   /**
-   * Busca marcações de ponto (somente leitura)
-   * NÃO cria, altera, ajusta ou exclui marcações na Sólides
+   * Busca resumo diário de ponto (somente leitura)
+   * Endpoint: GET /daily-summary/
+   *
+   * Retorna cálculos de:
+   * - Horas trabalhadas
+   * - Saldo de horas
+   * - Atrasos
+   * - Horas extras
+   *
+   * NÃO altera nenhuma marcação de ponto
    */
-  async fetchPunches(startDate: string, endDate: string): Promise<SolidesPunch[]> {
+  async fetchDailySummary(
+    employeeId: number,
+    startDate: string,
+    endDate: string
+  ): Promise<TangerinoDailySummary[]> {
     try {
-      // Usa punchesBaseUrl se definido, senão usa baseUrl
-      const punchesBase = this.config.punchesBaseUrl || this.config.baseUrl;
-      const url = new URL(`${punchesBase}${this.config.punchesPath}`);
-      url.searchParams.set('start', startDate);
-      url.searchParams.set('end', endDate);
+      const startTimestamp = dateToTimestamp(startDate);
+      const endTimestamp = dateToTimestamp(endDate);
+
+      const url = new URL(`${this.config.punchesBaseUrl}${this.config.punchesPath}`);
+      url.searchParams.set('employeeId', employeeId.toString());
+      url.searchParams.set('startDate', startTimestamp.toString());
+      url.searchParams.set('endDate', endTimestamp.toString());
+      url.searchParams.set('reprocess', 'false');
 
       logger.info(
-        { url: url.toString(), startDate, endDate },
-        '[READ-ONLY] Buscando marcações de ponto do Tangerino - Somente consulta'
+        {
+          url: url.toString(),
+          employeeId,
+          startDate,
+          endDate,
+          startTimestamp,
+          endTimestamp
+        },
+        '[READ-ONLY] Buscando resumo diário do Tangerino - Somente consulta'
       );
 
       const response = await this.secureRequest(url.toString());
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json() as Record<string, unknown>;
 
-      // Adapta a resposta - formato pode variar conforme API Tangerino
-      const rawPunches = Array.isArray(data)
+      // Adapta a resposta
+      const rawSummaries = Array.isArray(data)
         ? data
-        : (data.punches || data.data || data.items || data.marcacoes || []);
-
-      const punches = rawPunches as Record<string, unknown>[];
+        : ((data.content || data.data || data.items || []) as Record<string, unknown>[]);
 
       logger.info(
-        { count: punches.length, startDate, endDate },
-        '[READ-ONLY] Marcações de ponto consultadas do Tangerino - Nenhuma alteração enviada para a Sólides'
+        { count: rawSummaries.length, employeeId, startDate, endDate },
+        '[READ-ONLY] Resumo diário consultado do Tangerino - Nenhuma alteração enviada'
       );
 
-      return punches.map((punch) => ({
-        employeeId: String(
-          punch.employee_id ||
-          punch.employeeId ||
-          punch.funcionario_id ||
-          punch.codigo_funcionario ||
-          punch.id
-        ),
-        timestamp: String(
-          punch.timestamp ||
-          punch.date ||
-          punch.punch_time ||
-          punch.data_hora ||
-          punch.dataHora
-        ),
-        type: punch.type || punch.tipo ? String(punch.type || punch.tipo) : undefined,
-        ...punch,
+      return rawSummaries.map((summary: Record<string, unknown>) => ({
+        id: Number(summary.id || 0),
+        employeeId: Number(summary.employeeId || employeeId),
+        employerId: Number(summary.employerId || 0),
+        date: String(summary.date || ''),
+        workedHours: Number(summary.workedHours || 0),
+        hoursBalance: Number(summary.hoursBalance || 0),
+        estimatedHours: Number(summary.estimatedHours || 0),
+        overtimeTypeOne: Number(summary.overtimeTypeOne || 0),
+        overtimeTypeTwo: Number(summary.overtimeTypeTwo || 0),
+        overtimeTypeThree: Number(summary.overtimeTypeThree || 0),
+        overtimeTypeFour: Number(summary.overtimeTypeFour || 0),
+        nightHours: Number(summary.nightHours || 0),
+        paidHours: Number(summary.paidHours || 0),
+        fictaHours: Number(summary.fictaHours || 0),
+        compensatoryHoursBalance: Number(summary.compensatoryHoursBalance || 0),
+        overlimitCompensatoryHoursBalance: Number(summary.overlimitCompensatoryHoursBalance || 0),
+        isHoliday: Boolean(summary.isHoliday),
+        missed: Boolean(summary.missed),
+        unjustifiedMiss: Boolean(summary.unjustifiedMiss),
+        isAdjustment: Boolean(summary.isAdjustment),
+        ...summary,
       }));
     } catch (error) {
       logger.error(
-        { error, startDate, endDate },
+        { error: error instanceof Error ? error.message : error, employeeId, startDate, endDate },
+        '[READ-ONLY] Erro ao buscar resumo diário do Tangerino'
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Busca marcações de ponto usando o endpoint /daily-summary/
+   * Itera por todos os funcionários e consolida os resultados
+   *
+   * NOTA: Este método é mantido para compatibilidade com a interface SolidesAdapter
+   * Internamente usa fetchDailySummary para cada funcionário
+   */
+  async fetchPunches(startDate: string, endDate: string): Promise<SolidesPunch[]> {
+    try {
+      logger.info(
+        { startDate, endDate },
+        '[READ-ONLY] fetchPunches chamado - Usando /daily-summary/ para buscar dados'
+      );
+
+      // Para buscar todos os punches, precisamos primeiro buscar os funcionários
+      // e depois o daily-summary de cada um
+      // Por enquanto, retorna array vazio - use fetchDailySummary diretamente
+      logger.warn(
+        '[READ-ONLY] fetchPunches: Use fetchDailySummary com employeeId específico para melhores resultados'
+      );
+
+      // Tenta buscar daily-summary sem employeeId (se a API suportar)
+      const url = new URL(`${this.config.punchesBaseUrl}${this.config.punchesPath}`);
+      url.searchParams.set('startDate', dateToTimestamp(startDate).toString());
+      url.searchParams.set('endDate', dateToTimestamp(endDate).toString());
+      url.searchParams.set('reprocess', 'false');
+
+      const response = await this.secureRequest(url.toString());
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json() as Record<string, unknown>;
+      const rawSummaries = Array.isArray(data)
+        ? data
+        : ((data.content || data.data || data.items || []) as Record<string, unknown>[]);
+
+      logger.info(
+        { count: rawSummaries.length, startDate, endDate },
+        '[READ-ONLY] Dados de ponto consultados via /daily-summary/'
+      );
+
+      // Converte DailySummary para o formato SolidesPunch para compatibilidade
+      return rawSummaries.map((summary) => ({
+        employeeId: String(summary.employeeId || ''),
+        timestamp: String(summary.date || ''),
+        type: 'DAILY_SUMMARY',
+        workedHours: summary.workedHours,
+        hoursBalance: summary.hoursBalance,
+        missed: summary.missed,
+        ...summary,
+      }));
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : error, startDate, endDate },
         '[READ-ONLY] Erro ao buscar marcações de ponto do Tangerino'
       );
       throw error;
@@ -343,7 +463,7 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
 /**
  * Cria instância do adapter READ-ONLY para Tangerino/Sólides
  */
-export function createSolidesAdapter(config: TangerinoConfig): SolidesAdapter {
+export function createSolidesAdapter(config: TangerinoConfig): TangerinoReadOnlyAdapter {
   logger.info(
     '[READ-ONLY] Criando adapter Tangerino em modo somente leitura'
   );

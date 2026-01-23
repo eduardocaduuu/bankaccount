@@ -12,13 +12,19 @@ const envSchema = z.object({
   // Auth
   API_INTERNAL_TOKEN: z.string().min(10),
 
-  // Sólides/Tangerino
-  SOLIDES_BASE_URL: z.string().url(), // URL para funcionários (employer.tangerino.com.br)
-  SOLIDES_PUNCHES_BASE_URL: z.string().url().optional(), // URL para punches (apis.tangerino.com.br/punch) - se não definido, usa SOLIDES_BASE_URL
+  // Sólides/Tangerino - Integração READ-ONLY
+  // URL para funcionários (employer.tangerino.com.br) - usado para buscar lista de funcionários
+  SOLIDES_BASE_URL: z.string().url(),
+  // URL para punches/daily-summary (apis.tangerino.com.br/punch) - OBRIGATÓRIO
+  SOLIDES_PUNCHES_BASE_URL: z.string().url(),
+  // API Key do Tangerino (token de autenticação)
   SOLIDES_API_KEY: z.string().min(1),
+  // Nome do header para enviar a API Key (padrão: Authorization)
   SOLIDES_API_KEY_HEADER_NAME: z.string().default('Authorization'),
+  // Path para buscar funcionários
   SOLIDES_EMPLOYEES_PATH: z.string().default('/employee/find-all'),
-  SOLIDES_PUNCHES_PATH: z.string().default('/'),
+  // Path para buscar daily-summary (resumo diário de ponto)
+  SOLIDES_PUNCHES_PATH: z.string().default('/daily-summary/'),
 
   // Jobs
   DAILY_CLOSE_CRON: z.string().default('30 18 * * 1-5'),

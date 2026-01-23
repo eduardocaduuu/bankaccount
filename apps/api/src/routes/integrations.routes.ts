@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { createSolidesAdapter } from '../integrations/solides/adapter.js';
 import { SyncService } from '../services/sync.service.js';
-import type { ApiResponse, SyncResponse } from '@controle-ponto/types';
+import type { ApiResponse, SyncResponse, TangerinoDailySummary } from '@controle-ponto/types';
 import { logger } from '../utils/logger.js';
 
 // ===========================================
@@ -13,8 +13,8 @@ import { logger } from '../utils/logger.js';
 // IMPORTANTE: Integração READ-ONLY (Somente Leitura)
 //
 // Estas rotas APENAS consultam dados do Tangerino:
-// - Funcionários
-// - Marcações de ponto
+// - Funcionários (employer.tangerino.com.br)
+// - Resumo diário de ponto via /daily-summary/ (apis.tangerino.com.br/punch)
 //
 // NENHUM dado é enviado de volta para o Tangerino.
 // O ponto oficial continua sendo o do Tangerino/Sólides.
@@ -22,6 +22,12 @@ import { logger } from '../utils/logger.js';
 // ===========================================
 
 const syncQuerySchema = z.object({
+  start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD'),
+  end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD'),
+});
+
+const dailySummaryQuerySchema = z.object({
+  employeeId: z.string().transform(Number),
   start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD'),
   end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD'),
 });
@@ -41,33 +47,45 @@ export async function integrationsRoutes(app: FastifyInstance) {
   // ===========================================
   // POST /integrations/solides/test
   // ===========================================
-  // Testa conexão com Tangerino (somente leitura)
-  // Executa um GET simples para verificar autenticação
+  // Testa conexão com Tangerino /daily-summary/ (somente leitura)
+  // Executa um GET com parâmetros mock para verificar autenticação
   // ===========================================
   app.post('/integrations/solides/test', async (request, reply) => {
-    logger.info('[READ-ONLY] Iniciando teste de conexão com Tangerino');
+    logger.info({
+      punchesBaseUrl: env.SOLIDES_PUNCHES_BASE_URL,
+      punchesPath: env.SOLIDES_PUNCHES_PATH,
+    }, '[READ-ONLY] Iniciando teste de conexão com Tangerino /daily-summary/');
 
     try {
       const isConnected = await solidesAdapter.testConnection();
 
       if (isConnected) {
-        logger.info('[READ-ONLY] Teste de conexão bem-sucedido - Nenhum dado enviado para Tangerino');
+        logger.info('[READ-ONLY] Teste de conexão bem-sucedido - Endpoint /daily-summary/ respondeu');
         return {
           success: true,
-          message: 'Conexão com Tangerino estabelecida com sucesso (somente leitura)',
+          message: 'Conexão com Tangerino /daily-summary/ estabelecida com sucesso (somente leitura)',
           mode: 'READ-ONLY',
+          endpoint: `${env.SOLIDES_PUNCHES_BASE_URL}${env.SOLIDES_PUNCHES_PATH}`,
           warning: 'Esta integração apenas consulta dados. Nenhuma alteração é enviada para o Tangerino.',
         };
       } else {
-        logger.warn('[READ-ONLY] Teste de conexão falhou');
+        logger.warn({
+          punchesBaseUrl: env.SOLIDES_PUNCHES_BASE_URL,
+          punchesPath: env.SOLIDES_PUNCHES_PATH,
+        }, '[READ-ONLY] Teste de conexão falhou - Verifique o token e as configurações');
         return reply.status(503).send({
           success: false,
-          error: 'Não foi possível conectar ao Tangerino',
+          error: 'Não foi possível conectar ao Tangerino /daily-summary/',
+          endpoint: `${env.SOLIDES_PUNCHES_BASE_URL}${env.SOLIDES_PUNCHES_PATH}`,
           mode: 'READ-ONLY',
+          hint: 'Verifique se o token está correto e se o endpoint está acessível',
         });
       }
     } catch (error) {
-      logger.error({ error }, '[READ-ONLY] Erro ao testar conexão com Tangerino');
+      logger.error({
+        error: error instanceof Error ? error.message : error,
+        punchesBaseUrl: env.SOLIDES_PUNCHES_BASE_URL,
+      }, '[READ-ONLY] Erro ao testar conexão com Tangerino');
       return reply.status(500).send({
         success: false,
         error: 'Erro ao testar conexão',
@@ -78,11 +96,88 @@ export async function integrationsRoutes(app: FastifyInstance) {
   });
 
   // ===========================================
+  // GET /integrations/solides/daily-summary
+  // ===========================================
+  // Busca resumo diário de ponto de um funcionário específico
+  // Retorna: horas trabalhadas, saldo, atrasos, extras
+  // ===========================================
+  app.get<{ Querystring: { employeeId: string; start: string; end: string } }>(
+    '/integrations/solides/daily-summary',
+    async (request, reply) => {
+      logger.info(
+        { query: request.query },
+        '[READ-ONLY] Buscando resumo diário de ponto'
+      );
+
+      const result = dailySummaryQuerySchema.safeParse(request.query);
+
+      if (!result.success) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Parâmetros inválidos',
+          message: result.error.message,
+          mode: 'READ-ONLY',
+          hint: 'Formato: ?employeeId=123&start=YYYY-MM-DD&end=YYYY-MM-DD',
+        });
+      }
+
+      const { employeeId, start, end } = result.data;
+
+      // Validar que start <= end
+      if (new Date(start) > new Date(end)) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Data de início deve ser menor ou igual à data de fim',
+          mode: 'READ-ONLY',
+        });
+      }
+
+      try {
+        logger.info(
+          { employeeId, start, end },
+          '[READ-ONLY] Consultando /daily-summary/ do Tangerino'
+        );
+
+        const dailySummaries = await solidesAdapter.fetchDailySummary(employeeId, start, end);
+
+        logger.info(
+          { employeeId, start, end, count: dailySummaries.length },
+          '[READ-ONLY] Resumo diário consultado com sucesso'
+        );
+
+        return {
+          success: true,
+          data: dailySummaries,
+          meta: {
+            employeeId,
+            startDate: start,
+            endDate: end,
+            recordCount: dailySummaries.length,
+          },
+          mode: 'READ-ONLY',
+          warning: 'Dados consultados do Tangerino. Nenhuma alteração foi enviada.',
+        };
+      } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : error, employeeId, start, end },
+          '[READ-ONLY] Erro ao buscar resumo diário'
+        );
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao buscar resumo diário',
+          message: error instanceof Error ? error.message : 'Erro desconhecido',
+          mode: 'READ-ONLY',
+        });
+      }
+    }
+  );
+
+  // ===========================================
   // POST /integrations/solides/sync
   // ===========================================
   // Sincroniza dados DO Tangerino PARA o banco local
   // - Busca funcionários (GET)
-  // - Busca marcações (GET)
+  // - Busca resumo diário via /daily-summary/ (GET)
   // - Salva no banco local
   // - NÃO envia nada de volta para o Tangerino
   // ===========================================
@@ -119,7 +214,7 @@ export async function integrationsRoutes(app: FastifyInstance) {
       try {
         logger.info(
           { start, end },
-          '[READ-ONLY] Executando sincronização - Consulta de funcionários e marcações'
+          '[READ-ONLY] Executando sincronização - Consulta via /daily-summary/'
         );
 
         const syncResult = await syncService.fullSync(start, end);
@@ -142,7 +237,7 @@ export async function integrationsRoutes(app: FastifyInstance) {
         };
       } catch (error) {
         logger.error(
-          { error, start, end },
+          { error: error instanceof Error ? error.message : error, start, end },
           '[READ-ONLY] Erro durante sincronização'
         );
         return reply.status(500).send({
@@ -165,8 +260,13 @@ export async function integrationsRoutes(app: FastifyInstance) {
       success: true,
       data: {
         baseUrl: env.SOLIDES_BASE_URL,
+        punchesBaseUrl: env.SOLIDES_PUNCHES_BASE_URL,
         employeesPath: env.SOLIDES_EMPLOYEES_PATH,
         punchesPath: env.SOLIDES_PUNCHES_PATH,
+        endpoints: {
+          employees: `${env.SOLIDES_BASE_URL}${env.SOLIDES_EMPLOYEES_PATH}`,
+          dailySummary: `${env.SOLIDES_PUNCHES_BASE_URL}${env.SOLIDES_PUNCHES_PATH}`,
+        },
         mode: 'READ-ONLY',
         // Não expõe API key por segurança
       },
@@ -185,8 +285,13 @@ export async function integrationsRoutes(app: FastifyInstance) {
       data: {
         mode: 'READ-ONLY',
         description: 'Integração somente leitura com Tangerino/Sólides',
+        apiEndpoints: {
+          employees: env.SOLIDES_BASE_URL,
+          dailySummary: env.SOLIDES_PUNCHES_BASE_URL,
+        },
         capabilities: {
           readEmployees: true,
+          readDailySummary: true,
           readPunches: true,
           writeEmployees: false,
           writePunches: false,

@@ -191,10 +191,41 @@ export interface SolidesPunch {
   [key: string]: unknown;
 }
 
+/**
+ * Resumo diário retornado pelo endpoint /daily-summary/ do Tangerino
+ * Contém cálculos de horas trabalhadas, saldo, atrasos e extras
+ */
+export interface TangerinoDailySummary {
+  id: number;
+  employeeId: number;
+  employerId: number;
+  date: string;
+  workedHours: number;          // Horas trabalhadas (em minutos ou formato HH:mm)
+  hoursBalance: number;         // Saldo de horas
+  estimatedHours: number;       // Horas esperadas
+  overtimeTypeOne: number;      // Hora extra tipo 1
+  overtimeTypeTwo: number;      // Hora extra tipo 2
+  overtimeTypeThree: number;    // Hora extra tipo 3
+  overtimeTypeFour: number;     // Hora extra tipo 4
+  nightHours: number;           // Horas noturnas
+  paidHours: number;            // Horas pagas
+  fictaHours: number;           // Horas fictas
+  compensatoryHoursBalance: number;
+  overlimitCompensatoryHoursBalance: number;
+  isHoliday: boolean;
+  missed: boolean;              // Falta
+  unjustifiedMiss: boolean;     // Falta injustificada
+  isAdjustment: boolean;
+  lateMinutes?: number;         // Atraso em minutos (calculado)
+  extraMinutes?: number;        // Extra em minutos (calculado)
+  [key: string]: unknown;
+}
+
 export interface SolidesAdapter {
   testConnection(): Promise<boolean>;
   fetchEmployees(): Promise<SolidesEmployee[]>;
   fetchPunches(startDate: string, endDate: string): Promise<SolidesPunch[]>;
+  fetchDailySummary(employeeId: number, startDate: string, endDate: string): Promise<TangerinoDailySummary[]>;
 }
 
 // ===========================================
