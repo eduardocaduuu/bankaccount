@@ -12,12 +12,13 @@ const envSchema = z.object({
   // Auth
   API_INTERNAL_TOKEN: z.string().min(10),
 
-  // Sólides
-  SOLIDES_BASE_URL: z.string().url(),
+  // Sólides/Tangerino
+  SOLIDES_BASE_URL: z.string().url(), // URL para funcionários (employer.tangerino.com.br)
+  SOLIDES_PUNCHES_BASE_URL: z.string().url().optional(), // URL para punches (apis.tangerino.com.br/punch) - se não definido, usa SOLIDES_BASE_URL
   SOLIDES_API_KEY: z.string().min(1),
   SOLIDES_API_KEY_HEADER_NAME: z.string().default('Authorization'),
-  SOLIDES_EMPLOYEES_PATH: z.string().default('/v1/employees'),
-  SOLIDES_PUNCHES_PATH: z.string().default('/v1/punches'),
+  SOLIDES_EMPLOYEES_PATH: z.string().default('/employee/find-all'),
+  SOLIDES_PUNCHES_PATH: z.string().default('/'),
 
   // Jobs
   DAILY_CLOSE_CRON: z.string().default('30 18 * * 1-5'),

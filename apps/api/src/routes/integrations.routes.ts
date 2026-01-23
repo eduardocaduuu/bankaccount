@@ -29,6 +29,7 @@ const syncQuerySchema = z.object({
 export async function integrationsRoutes(app: FastifyInstance) {
   const solidesAdapter = createSolidesAdapter({
     baseUrl: env.SOLIDES_BASE_URL,
+    punchesBaseUrl: env.SOLIDES_PUNCHES_BASE_URL,
     apiKey: env.SOLIDES_API_KEY,
     apiKeyHeaderName: env.SOLIDES_API_KEY_HEADER_NAME,
     employeesPath: env.SOLIDES_EMPLOYEES_PATH,

@@ -21,7 +21,8 @@ import { logger } from '../../utils/logger.js';
 // ===========================================
 
 export interface TangerinoConfig {
-  baseUrl: string;
+  baseUrl: string; // URL para funcionários
+  punchesBaseUrl?: string; // URL para punches (se diferente)
   apiKey: string;
   apiKeyHeaderName: string;
   employeesPath: string;
@@ -225,7 +226,9 @@ export class TangerinoReadOnlyAdapter implements SolidesAdapter {
    */
   async fetchPunches(startDate: string, endDate: string): Promise<SolidesPunch[]> {
     try {
-      const url = new URL(`${this.config.baseUrl}${this.config.punchesPath}`);
+      // Usa punchesBaseUrl se definido, senão usa baseUrl
+      const punchesBase = this.config.punchesBaseUrl || this.config.baseUrl;
+      const url = new URL(`${punchesBase}${this.config.punchesPath}`);
       url.searchParams.set('start', startDate);
       url.searchParams.set('end', endDate);
 
