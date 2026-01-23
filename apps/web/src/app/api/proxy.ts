@@ -20,6 +20,9 @@ export async function proxyRequest(
 
   console.log(`[Proxy] ${method} ${url} - Token: ${API_TOKEN ? 'present' : 'missing'}`);
 
+  // For POST requests without body, send empty object to avoid Fastify error
+  const requestBody = method === 'POST' ? JSON.stringify(body || {}) : undefined;
+
   try {
     const response = await fetch(url, {
       method,
@@ -27,7 +30,7 @@ export async function proxyRequest(
         'Content-Type': 'application/json',
         'x-internal-token': API_TOKEN,
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: requestBody,
       cache: 'no-store',
     });
 
